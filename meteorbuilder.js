@@ -42,7 +42,7 @@ function getMeteorDockerfile(meteorVersionString) {
   // - locales: for MongoDB
   // - libfontconfig: for PhantomJS (Meteor testing)
   return `# Dockerfile
-FROM debian:wheezy-slim
+FROM debian:jessie-slim
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install tools
