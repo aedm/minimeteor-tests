@@ -1,9 +1,8 @@
 "use strict";
 
-const spawn = require('child_process').spawn;
-const execSync = require('child_process').execSync;
+const child_process = require('child_process');
 const fs = require('fs');
-const stream = require('stream');
+const tmp = require('tmp');
 
 const DockerHub = require("./lib/dockerhub.js");
 const Util = require("./lib/util.js");
@@ -15,7 +14,7 @@ const NodeLabel = "METEORCRAWLER_NODE_VERSION=";
 
 function makeTempDir() {
   try {
-    return execSync("mktemp -d").toString().trim();
+    return tmp.dirSync({prefix: 'minimeteor-'}).name;
   } catch (ex) {
     console.error("Cannot create temp directory");
     process.exit(1);
@@ -68,8 +67,8 @@ function buildMeteor(meteorVersion) {
   fs.writeFileSync(`${tempDir}/Dockerfile`, content);
 
   Logger.log("Running docker build...");
-  let dockerProcess = spawn("docker", ["build", "-t", dockerTag, tempDir],
-      {stdio: [null, null, "inherit"]});
+  let dockerProcess = child_process.spawn("docker", ["build", "-t", dockerTag, tempDir],
+    {stdio: [null, null, "inherit"]});
 
   let output = "";
   dockerProcess.stdout.on('data', data => {
@@ -87,8 +86,7 @@ function buildMeteor(meteorVersion) {
     Logger.log("Build succesful.");
 
     // Enqueue alpine build
-    let nodeVersion = output.split("\n").
-      find(s => s.indexOf(NodeLabel) >= 0 && s.indexOf(`echo ${NodeLabel}`) < 0);
+    let nodeVersion = output.split("\n").find(s => s.indexOf(NodeLabel) >= 0 && s.indexOf(`echo ${NodeLabel}`) < 0);
     if (!nodeVersion) {
       Logger.error("Node version not found, quitting.");
       Util.sendMail(`FAILED: ${dockerTag}`);
@@ -97,7 +95,7 @@ function buildMeteor(meteorVersion) {
 
     Logger.log("Found Node version", nodeVersion);
     nodeVersion = nodeVersion.substring(
-        nodeVersion.indexOf(NodeLabel) + NodeLabel.length).replace(/^(v)/, "");
+      nodeVersion.indexOf(NodeLabel) + NodeLabel.length).replace(/^(v)/, "");
     Util.enqueueAlpineTag(nodeVersion);
 
     // Push docker image
@@ -108,13 +106,13 @@ function buildMeteor(meteorVersion) {
       Util.sendMail(`FAILED: ${dockerTag} was built, but can't be sent to Docker Hub.`);
     }
 
-    Util.wipeDockerImages();
+    Util.cleanupDocker();
     Logger.log("Build successful:", dockerTag);
   });
 }
 
 
-function main() {
+async function main() {
   if (process.argv.length > 3) {
     console.log(`Usage: node build-meteor.js [meteor-version]`);
     process.exit(0);
@@ -123,36 +121,37 @@ function main() {
   Logger.log("======================================================");
   Logger.log("Meteor builder");
 
-  let versionFromCommandLine = (process.argv.length == 3);
+  let versionFromCommandLine = (process.argv.length === 3);
   let meteorVersion = null;
   if (versionFromCommandLine) {
     meteorVersion = process.argv[2];
   }
 
-  DockerHub.getDockerHubTags(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE)
-  .then(dockerTags => {
-    if (versionFromCommandLine) {
-      // Check whether this version is already built
-      if (dockerTags.find(tag => tag == meteorVersion)) {
-        Logger.log("Already built", meteorVersion);
-        return;
-      }
-    } else {
-      // Find a version that's not built yet
-      meteorVersion = Util.deqeueMeteorTag(dockerTags);
-      if (!meteorVersion) {
-        Logger.log("Nothing to build");
-        return;
-      }
+  // Get all Docker tags from Docker Hub
+  let dockerTags = await DockerHub.getDockerHubTags(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE);
+  if (versionFromCommandLine) {
+    // Check whether this version is already built
+    if (dockerTags.find(tag => tag === meteorVersion)) {
+      Logger.log("Already built", meteorVersion);
+      return;
     }
-    buildMeteor(meteorVersion);
+  } else {
+    // Find a version that's not built yet
+    meteorVersion = Util.deqeueMeteorTag(dockerTags);
+    if (!meteorVersion) {
+      Logger.log("Nothing to build");
+      return;
+    }
+  }
+  buildMeteor(meteorVersion);
 
-    if (!versionFromCommandLine) {
-      // If the build version comes from the queue, there might be more of it
-      Util.spoolMeteorBuilder();
-    }
-  });
+  if (!versionFromCommandLine) {
+    // If the build version comes from the queue, there might be more of it
+    Util.spoolMeteorBuilder();
+  }
 }
 
-main();
+
+main().catch(err => Logger.error(err));
+
 

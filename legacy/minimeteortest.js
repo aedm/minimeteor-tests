@@ -101,7 +101,7 @@ function testMeteor(meteorTag, buildCallback, testTag) {
   Util.tryExec(`docker rm autominitest`, {stdio: "inherit"});
   Util.tryExec(`docker stop minimeteor-${fullTestTag.replace(/[:/]/g, "--")}`, {stdio: "inherit"});
   Util.tryExec(`rm -rf ${tempDir}`);
-  Util.wipeDockerImages();
+  Util.cleanupDocker();
   console.log("Finished building", testTag);
 }
 

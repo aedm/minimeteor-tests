@@ -56,7 +56,7 @@ function buildAlpineBuilder(dockerTags, tempDir) {
     Util.sendMail(`FAILED: ${dockerTag} was built, but can't be sent to Docker Hub.`);
   }
 
-  Util.wipeDockerImages();
+  Util.cleanupDocker();
   Logger.log("Alpine build successful:", nodeVersion);
 }
 

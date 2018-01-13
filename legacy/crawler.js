@@ -1,5 +1,7 @@
 "use strict";
 
+require('dotenv').config();
+
 const Version = require("./lib/version.js");
 const GitHub = require("./lib/github.js");
 const DockerHub = require("./lib/dockerhub.js");
@@ -10,36 +12,28 @@ const Logger = require("./lib/logger.js");
 function createBuildList(releaseTags, meteorDockerTags) {
   Logger.debug("Creating build list");
   for (let tag of releaseTags) {
-    if (meteorDockerTags.find(x => x == tag)) continue;
+    if (meteorDockerTags.find(x => x === tag)) continue;
     let version = Version.fromString(tag);
     if (!version || version.isSubversion || version.isLessThan([1,3])) continue;
     Util.enqueueMeteorTag(tag);
   }
 }
 
-function main() {
-  let releaseTags = [];
-  let meteorDockerTags = [];
-
+async function main() {
   // Process GitHub tags
-  GitHub.getGithubTags("meteor", "meteor")
-  .then(tags => {
-    for (let tag of tags) {
-      if (tag.startsWith(Config.METEOR_RELEASE_TAG)) {
-        releaseTags.push(tag.substring(Config.METEOR_RELEASE_TAG.length));
-      }
-    }
-    Logger.debug(`${releaseTags.length} release tags found.`);
-    return DockerHub.getDockerHubTags(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE);
-  })
+  let gitTags = await GitHub.getGithubTags("meteor", "meteor");
+
+  let releaseTags = gitTags
+    .filter(tag => tag.startsWith(Config.METEOR_RELEASE_TAG))
+    .map(tag => tag.substring(Config.METEOR_RELEASE_TAG.length));
+
+  Logger.debug(`${releaseTags.length} release tags found.`);
+  let dockerTags = await DockerHub.getDockerHubTags(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE);
 
   // Process aedm/meteor Docker tags
-  .then(tags => {
-    meteorDockerTags = tags;
-    createBuildList(releaseTags, meteorDockerTags);
-  });
+  createBuildList(releaseTags, dockerTags);
 }
 
-main();
+main().catch(err => Logger.error(err));
 
 
