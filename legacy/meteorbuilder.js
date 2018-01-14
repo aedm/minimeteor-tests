@@ -128,7 +128,7 @@ async function main() {
   }
 
   // Get all Docker tags from Docker Hub
-  let dockerTags = await DockerHub.getDockerHubTags(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE);
+  let dockerTags = await DockerHub.getDockerHubTagNames(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE);
   if (versionFromCommandLine) {
     // Check whether this version is already built
     if (dockerTags.find(tag => tag === meteorVersion)) {

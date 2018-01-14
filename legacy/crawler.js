@@ -28,7 +28,7 @@ async function main() {
     .map(tag => tag.substring(Config.METEOR_RELEASE_TAG.length));
 
   Logger.debug(`${releaseTags.length} release tags found.`);
-  let dockerTags = await DockerHub.getDockerHubTags(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE);
+  let dockerTags = await DockerHub.getDockerHubTagNames(Config.DOCKER_OWNER, Config.DOCKER_METEOR_IMAGE);
 
   // Process aedm/meteor Docker tags
   createBuildList(releaseTags, dockerTags);

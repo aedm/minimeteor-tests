@@ -68,7 +68,7 @@ function main() {
   let tempDir = makeTempDir();
   console.log("Using temp directory", tempDir);
 
-  DockerHub.getDockerHubTags(Config.DOCKER_OWNER, Config.DOCKER_ALPINE_IMAGE)
+  DockerHub.getDockerHubTagNames(Config.DOCKER_OWNER, Config.DOCKER_ALPINE_IMAGE)
   .then(dockerTags => {
     buildAlpineBuilder(dockerTags, tempDir);
 

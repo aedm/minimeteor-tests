@@ -1,11 +1,12 @@
 "use strict";
 
-// Build minimeteor script test
+/**
+ * Tests Docker-based version of Minimeteor
+ */
 
-const spawn = require('child_process').spawn;
 const fs = require('fs');
-const stream = require('stream');
 const sleep = require('sleep');
+const tmp = require('tmp');
 
 const DockerHub = require("./lib/dockerhub.js");
 const GitHub = require("./lib/github.js");
@@ -14,21 +15,55 @@ const Config = require("./lib/config.js");
 const Version = require("./lib/version.js");
 const Logger = require("./lib/logger.js");
 
-function dockerTestTag(meteorTag, minimeteorTag) {
-  return `${meteorTag}-docker-${minimeteorTag.name}-${minimeteorTag.last_updated.replace(/:/g, "-").replace(/T/g, "_")}`;
-}
-
-function gitTestTag(meteorTag, gitBranch) {
-  return `${meteorTag}-script-${gitBranch.name}-${gitBranch.commit.sha}`;
-}
-
-function makeTempDir() {
+/**
+ * Builds and tests a Meteor project using Docker-based Minimeteor
+ * @param dockerHubBuildTestImages [string]  All Minimeteor test images from Docker Hub
+ * @param dockerHubMeteorImages [string]  All Meteor images from Docker Hub
+ * @returns {Promise<void>}
+ */
+async function tryTestMinimeteorDocker(dockerHubBuildTestImages, dockerHubMeteorImages) {
   try {
-    return Util.retExec("mktemp -d");
-  } catch (ex) {
-    Logger.error("Cannot create temp directory");
-    process.exit(1);
+    let tags = findTagToBuild(dockerHubBuildTestImages, dockerHubMeteorImages);
+    if (!tags) return;
+    testMeteor(tags.meteorTag, buildByDocker, tags.testTag);
+
+    // await buildMeteor(tag);
   }
+  catch (ex) {
+    Logger.error("Minimeteor (docker version) failed:", ex.toString());
+  }
+}
+
+/**
+ * Returns a Docker tag and a Meteor image tag to build together
+ * @param dockerHubBuildTestImages [string]  All Minimeteor test images from Docker Hub
+ * @param dockerHubMeteorImages [string]  All Meteor images from Docker Hub
+ * @returns {Promise<{meteorTag: string, minimeteorTag: string, testTag: string}>}
+ */
+async function findTagToBuild(dockerHubBuildTestImages, dockerHubMeteorImages) {
+  let dockerHubMinimeteorTags = await DockerHub.getDockerHubFullTags(Config.DOCKER_MINIMETEOR_IMAGE);
+
+  for (let minimeteorTag of dockerHubMinimeteorTags) {
+    for (let meteorTag of dockerHubMeteorImages) {
+      // Try all combinations of Minimeteor images and Meteor images
+      let testTag = dockerTestTag(meteorTag, minimeteorTag);
+      if (!dockerHubBuildTestImages.some(x => x === testTag)) {
+        // Found a combination that has not yet been tested
+        return {meteorTag, minimeteorTag, testTag};
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns a Minimeteor test image tag generated from a Meteor image tag and a Minimeteor image tag
+ * @param meteorTagName {string}  Name field from Meteor image tag
+ * @param minimeteorTag {Object}  Minimeteor image tag
+ * @return {string}  Final tag for a tested Minimeteor test image
+ */
+function dockerTestTag(meteorTagName, minimeteorTag) {
+  return `${meteorTagName}-docker-${minimeteorTag.name}-${minimeteorTag.last_updated.replace(/:/g, "-").replace(/T/g, "_")}`;
 }
 
 function createMeteorProject(targetDir, meteorTag) {
@@ -41,7 +76,7 @@ function createMeteorProject(targetDir, meteorTag) {
     meteorCommandSwitches.push("--allow-superuser");
   }
   let meteorSwitch = meteorCommandSwitches.join(" ");
-  let fullMeteorTag = `${Config.DOCKER_OWNER}/${Config.DOCKER_METEOR_IMAGE}:${meteorTag}`;
+  let fullMeteorTag = `${Config.DOCKER_HUB_USER}/${Config.DOCKER_METEOR_IMAGE}:${meteorTag}`;
 
   let uid = Util.retExec("id -u");
   let meteorCommand = `meteor create ${meteorSwitch} /dockerhost`;
@@ -63,7 +98,7 @@ function buildByScript(targetDir, fullTestTag, gitBranch) {
 function testMeteor(meteorTag, buildCallback, testTag) {
   Logger.log("Building", testTag);
 
-  let tempDir = makeTempDir();
+  let tempDir = tmp.dirSync({prefix: 'minimeteor-'}).name;
   let fullTestTag = `${Config.DOCKER_OWNER}/${Config.DOCKER_BUILD_TEST_IMAGE}:${testTag}`;
 
   try {
@@ -172,6 +207,6 @@ function main() {
     });
 }
 
-main();
-
-
+module.exports = {
+  tryTestMinimeteorDocker,
+};

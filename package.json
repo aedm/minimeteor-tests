@@ -8,11 +8,10 @@
   },
   "keywords": [],
   "author": "",
-  "license": "MIT",
+  "license": "ISC",
   "dependencies": {
     "docker-hub-api": "^0.5.1",
     "dotenv": "^4.0.0",
-    "escape-html": "^1.0.3",
     "github": "^6.0.2",
     "rimraf": "^2.6.2",
     "sleep": "^5.0.0",

@@ -1,5 +1,5 @@
 /**
- * Tries to build images for a given Meteor release
+ * Tries to build Meteor docker images
  */
 
 const tmp = require('tmp');
@@ -15,20 +15,27 @@ const Util = require("./lib/util.js");
  * Builds a Meteor image that was released but not yet built
  * @param gitHubMeteorReleases [string]  All released Meteor versions from GitHub
  * @param dockerHubMeteorImages [string]  All Meteor images from Docker Hub
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}  True if a new image was built & pushed successfully
  */
 async function tryBuildMeteorImage(gitHubMeteorReleases, dockerHubMeteorImages) {
   try {
     let tag = findTagToBuild(gitHubMeteorReleases, dockerHubMeteorImages);
-    if (!tag) return;
-    await buildMeteor(tag);
+    if (!tag) return false;
+    let success = await buildMeteor(tag);
+    return success;
   }
   catch (ex) {
     Logger.error("Can't build Meteor image:", ex.toString());
   }
+  return false;
 }
 
-
+/**
+ * Returns a Meteor version that has been released but a Docker image was not yet built.
+ * @param gitHubMeteorReleases [string]  All released Meteor versions from GitHub
+ * @param dockerHubMeteorImages [string]  All Meteor images from Docker Hub
+ * @return {string}  Meteor version to be built
+ */
 function findTagToBuild(gitHubMeteorReleases, dockerHubMeteorImages) {
   Logger.debug("Finding Meteor tag to build image from...");
   for (let tag of gitHubMeteorReleases) {
@@ -76,7 +83,11 @@ RUN apt-get -qq update \
 `;
 }
 
-
+/**
+ * Builds a Meteor image
+ * @param meteorVersion
+ * @returns {Promise<boolean>}  True if a new image was built & pushed successfully
+ */
 async function buildMeteor(meteorVersion) {
   let dockerTag = `${Config.DOCKER_OWNER}/${Config.DOCKER_METEOR_IMAGE}:${meteorVersion}`;
   Logger.log("Building", dockerTag);
@@ -101,18 +112,20 @@ async function buildMeteor(meteorVersion) {
   if (dockerProcess.exitCode) {
     Util.sendMail(`FAILED: ${dockerTag}`);
     Logger.error("Build failed. Exit code:", dockerProcess.exitCode);
-    return;
+    return false;
   }
 
   // Push docker image
   Logger.log("Pushing image to Docker Hub...");
-  if (Util.exec(`docker push ${dockerTag}`)) {
-    Util.sendMail(`${dockerTag} built.`);
-  } else {
+  if (!Util.exec(`docker push ${dockerTag}`)) {
     Util.sendMail(`FAILED: ${dockerTag} was built, but can't be sent to Docker Hub.`);
+    Logger.error("Can't push image to Docker Hub:", dockerTag);
+    return false;
   }
 
+  Util.sendMail(`${dockerTag} built.`);
   Logger.log("Build successful:", dockerTag);
+  return true;
 }
 
 
