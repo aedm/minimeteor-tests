@@ -21,9 +21,11 @@ const Logger = require("./lib/logger.js");
  * @returns {Promise<void>}
  */
 async function tryTestMinimeteorDocker(dockerHubBuildTestImages, dockerHubMeteorImages) {
+  Logger.debug("---- test-minimeteor-docker.js::tryTestMinimeteorDocker ----");
   try {
-    let tags = findTagToBuild(dockerHubBuildTestImages, dockerHubMeteorImages);
+    let tags = await findTagToBuild(dockerHubBuildTestImages, dockerHubMeteorImages);
     if (!tags) return;
+    Logger.debug("Found untested combination:", tags);
     await testMeteor(tags.meteorTag, buildByDocker, tags.testTag);
 
     // await buildMeteor(tag);

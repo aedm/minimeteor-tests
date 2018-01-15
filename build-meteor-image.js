@@ -18,6 +18,7 @@ const Util = require("./lib/util.js");
  * @returns {Promise<boolean>}  True if a new image was built & pushed successfully
  */
 async function tryBuildMeteorImage(gitHubMeteorReleases, dockerHubMeteorImages) {
+  Logger.debug("---- build-meteor-image.js::tryBuildMeteorImage ----");
   try {
     let tag = findTagToBuild(gitHubMeteorReleases, dockerHubMeteorImages);
     if (!tag) return false;
@@ -89,7 +90,7 @@ RUN apt-get -qq update \
  * @returns {Promise<boolean>}  True if a new image was built & pushed successfully
  */
 async function buildMeteor(meteorVersion) {
-  let dockerTag = `${Config.DOCKER_OWNER}/${Config.DOCKER_METEOR_IMAGE}:${meteorVersion}`;
+  let dockerTag = `${Config.DOCKER_HUB_USER}/${Config.DOCKER_METEOR_IMAGE}:${meteorVersion}`;
   Logger.log("Building", dockerTag);
 
   // Create temp directory
@@ -117,7 +118,7 @@ async function buildMeteor(meteorVersion) {
 
   // Push docker image
   Logger.log("Pushing image to Docker Hub...");
-  if (!Util.exec(`docker push ${dockerTag}`)) {
+  if (Util.exec(`docker push ${dockerTag}`)) {
     Util.sendMail(`FAILED: ${dockerTag} was built, but can't be sent to Docker Hub.`);
     Logger.error("Can't push image to Docker Hub:", dockerTag);
     return false;
