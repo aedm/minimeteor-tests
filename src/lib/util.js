@@ -41,7 +41,11 @@ function tryExec(command) {
 
 function exec(command) {
   Logger.log("Executing:", command);
-  execSync(command, {stdio: "inherit"});
+  try {
+    execSync(command, {stdio: "inherit", stderr: "inherit"});
+  } catch (ex) {
+    throw `Can't execute command: ${command}`;
+  }
 }
 
 function retExec(command) {
@@ -66,10 +70,10 @@ function sendMail(content) {
   if (!isWindows) {
     let emailAddress = Config.EMAIL_ADDRESS;
     if (!emailAddress) {
-      Logger.error("No email address specified. Please set EMAIL_ADDRESS env variable.")
+      Logger.error("No email address specified. Please set EMAIL_ADDRESS env variable.");
       return;
     }
-    let escaped = content.replace('"', '\"');
+    let escaped = content.replace('"', '\\"');
     tryExec(`echo "Subject:[minimeteor]\\n\\n${escaped}" | /usr/sbin/sendmail ${emailAddress}`);
   }
 }

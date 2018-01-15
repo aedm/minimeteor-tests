@@ -21,7 +21,10 @@ async function tryBuildMeteorImage(gitHubMeteorReleases, dockerHubMeteorImages) 
   Logger.debug("---- build-meteor-image.js::tryBuildMeteorImage ----");
   try {
     let tag = findTagToBuild(gitHubMeteorReleases, dockerHubMeteorImages);
-    if (!tag) return false;
+    if (!tag) {
+      Logger.debug("Nothing to build.");
+      return false;
+    }
     let success = await buildMeteor(tag);
     return success;
   }
