@@ -5,7 +5,6 @@
  */
 
 const fs = require('fs');
-const sleep = require('sleep');
 const tmp = require('tmp');
 
 const DockerHub = require("./lib/dockerhub.js");
@@ -25,7 +24,7 @@ async function tryTestMinimeteorDocker(dockerHubBuildTestImages, dockerHubMeteor
   try {
     let tags = findTagToBuild(dockerHubBuildTestImages, dockerHubMeteorImages);
     if (!tags) return;
-    testMeteor(tags.meteorTag, buildByDocker, tags.testTag);
+    await testMeteor(tags.meteorTag, buildByDocker, tags.testTag);
 
     // await buildMeteor(tag);
   }
@@ -95,7 +94,7 @@ function buildByScript(targetDir, fullTestTag, gitBranch) {
   Util.exec(`cd ${targetDir} && timeout 2400 bash -c "curl ${scriptUrl} | sh -s ${fullTestTag}"`);
 }
 
-function testMeteor(meteorTag, buildCallback, testTag) {
+async function testMeteor(meteorTag, buildCallback, testTag) {
   Logger.log("Building", testTag);
 
   let tempDir = tmp.dirSync({prefix: 'minimeteor-'}).name;
@@ -116,7 +115,7 @@ function testMeteor(meteorTag, buildCallback, testTag) {
         Logger.log("Test server didn't respond, logs:");
         Util.exec(`docker logs autominitest`);
         Logger.log("Sleeping 1 second...");
-        sleep.sleep(1);
+        await Util.sleep(1000);
       }
     }
     if (httpContent === null) throw "Test server is permanently down.";
